@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>윤슬처럼 문의함</title>
+<style>
+  :root {
+    --bg: #fbf6ee; --card: #fffdf8; --ink: #3b2a1e; --ink-soft: #6e5a4a;
+    --accent: #c0673a; --accent-dark: #9e4f27; --line: #e6d8c3; --late: #c8402a;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, "Noto Sans KR", sans-serif; font-size: 16px; line-height: 1.6; word-break: keep-all; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 22px; margin: 8px 0 20px; }
+  input[type=password] { width: 100%; font: inherit; font-size: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; min-height: 52px; }
+  button { font: inherit; cursor: pointer; border-radius: 12px; min-height: 48px; }
+  .primary { background: var(--accent); color: #fff; border: 0; padding: 12px 20px; font-weight: 700; width: 100%; margin-top: 12px; }
+  .primary:hover { background: var(--accent-dark); }
+  .err { color: var(--late); margin-top: 10px; }
+
+  .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 34px; line-height: 1.2; }
+  .stat.late b { color: var(--late); }
+  .stat span { color: var(--ink-soft); font-size: 14px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .ghost { background: transparent; border: 1px solid var(--line); padding: 8px 14px; min-height: 40px; color: var(--ink-soft); }
+
+  .list { display: grid; gap: 12px; }
+  .item { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .item.late { border: 2px solid var(--late); }
+  .item .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .item .name { font-weight: 700; font-size: 18px; }
+  .item .when { color: var(--ink-soft); font-size: 14px; }
+  .late-tag { color: var(--late); font-weight: 700; font-size: 14px; }
+  .contact { display: inline-block; margin: 6px 0 10px; background: #fff; border: 1px dashed var(--line); padding: 6px 12px; min-height: 40px; color: var(--ink); }
+  dl { margin: 0 0 12px; display: grid; grid-template-columns: 84px 1fr; gap: 4px 10px; }
+  dt { color: var(--ink-soft); }
+  dd { margin: 0; font-weight: 500; }
+  .status { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .status button { background: #fff; border: 1px solid var(--line); color: var(--ink-soft); }
+  .status button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  .empty { text-align: center; color: var(--ink-soft); padding: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>윤슬처럼 문의함</h1>
+
+  <form id="login">
+    <label for="pw">관리자 비밀번호</label>
+    <input type="password" id="pw" autocomplete="current-password" required>
+    <button class="primary" type="submit">들어가기</button>
+    <div class="err" id="loginErr" hidden></div>
+  </form>
+
+  <div id="board" hidden>
+    <div class="summary">
+      <div class="stat"><b id="newCount">0</b><span>새 문의</span></div>
+      <div class="stat late"><b id="lateCount">0</b><span>답장 늦은 문의 (48시간 넘음)</span></div>
+    </div>
+    <div class="bar">
+      <span id="total" style="color:var(--ink-soft)"></span>
+      <span>
+        <button class="ghost" id="reload" type="button">새로고침</button>
+        <button class="ghost" id="logout" type="button">나가기</button>
+      </span>
+    </div>
+    <div class="err" id="boardErr" hidden></div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<script>
+  const KEY = 'yunseul_admin_pw';
+  const STATUSES = ['새 문의', '연락함', '완료'];
+  const LATE_MS = 48 * 60 * 60 * 1000;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  const meetFmt = (s) => {
+    if (!s) return '-';
+    const d = new Date(s + 'T00:00:00');
+    return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} (${'일월화수목금토'[d.getDay()]})`;
+  };
+
+  async function api(method, body) {
+    const r = await fetch('/api/admin', {
+      method,
+      headers: { 'x-admin-password': sessionStorage.getItem(KEY) || '', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { logout('비밀번호가 맞지 않아요.'); throw new Error(''); }
+    if (!r.ok) throw new Error(j.error || '불러오지 못했어요.');
+    return j;
+  }
+
+  function render(rows) {
+    const now = Date.now();
+    const isLate = (x) => x.status === '새 문의' && now - new Date(x.created_at).getTime() > LATE_MS;
+    $('newCount').textContent = rows.filter((x) => x.status === '새 문의').length;
+    $('lateCount').textContent = rows.filter(isLate).length;
+    $('total').textContent = `전체 ${rows.length}건`;
+    if (!rows.length) { $('list').innerHTML = '<div class="empty">아직 들어온 문의가 없어요.</div>'; return; }
+    $('list').innerHTML = rows.map((x) => `
+      <div class="item${isLate(x) ? ' late' : ''}">
+        <div class="head">
+          <span class="name">${esc(x.name)}</span>
+          <span class="when">${fmt(x.created_at)}${isLate(x) ? ' · <span class="late-tag">답장 늦음</span>' : ''}</span>
+        </div>
+        <button class="contact" type="button" data-copy="${esc(x.contact)}">${esc(x.contact)} · 눌러서 복사</button>
+        <dl>
+          <dt>모임 날짜</dt><dd>${esc(meetFmt(x.meet_date))}</dd>
+          <dt>인원</dt><dd>${x.people ? esc(x.people) + '명' : '-'}</dd>
+          <dt>1인당 예산</dt><dd>${esc(x.budget || '-')}</dd>
+          <dt>메뉴</dt><dd>${esc(x.menu_choice || '-')}</dd>
+        </dl>
+        <div class="status">
+          ${STATUSES.map((s) => `<button type="button" data-id="${x.id}" data-status="${s}" class="${x.status === s ? 'on' : ''}">${s}</button>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  async function load() {
+    $('boardErr').hidden = true;
+    try {
+      const { rows } = await api('GET');
+      $('login').hidden = true; $('board').hidden = false;
+      render(rows);
+    } catch (e) {
+      if (e.message) { $('boardErr').textContent = e.message; $('boardErr').hidden = false; }
+    }
+  }
+
+  function logout(message) {
+    sessionStorage.removeItem(KEY);
+    $('board').hidden = true; $('login').hidden = false;
+    $('pw').value = '';
+    $('loginErr').textContent = message || ''; $('loginErr').hidden = !message;
+    $('pw').focus();
+  }
+
+  $('login').addEventListener('submit', (e) => {
+    e.preventDefault();
+    sessionStorage.setItem(KEY, $('pw').value);
+    $('loginErr').hidden = true;
+    load();
+  });
+  $('reload').addEventListener('click', load);
+  $('logout').addEventListener('click', () => logout());
+
+  $('list').addEventListener('click', async (e) => {
+    const copy = e.target.closest('[data-copy]');
+    if (copy) {
+      const text = copy.dataset.copy;
+      try { await navigator.clipboard.writeText(text); copy.textContent = `${text} · 복사됨`; }
+      catch { const r = document.createRange(); r.selectNodeContents(copy); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+      return;
+    }
+    const b = e.target.closest('[data-status]');
+    if (!b || b.classList.contains('on')) return;
+    try { await api('PATCH', { id: Number(b.dataset.id), status: b.dataset.status }); load(); }
+    catch (err) { if (err.message) { $('boardErr').textContent = err.message; $('boardErr').hidden = false; } }
+  });
+
+  if (sessionStorage.getItem(KEY)) load(); else $('pw').focus();
+</script>
+</body>
+</html>
