@@ -1,3 +1,7 @@
 .env*
 .vercel
 node_modules
+# Vercel CLI가 설치한 에이전트 스킬 파일
+.agents/
+.claude/
+skills-lock.json
