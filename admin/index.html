@@ -120,7 +120,7 @@
           <dt>모임 날짜</dt><dd>${esc(meetFmt(x.meet_date))}</dd>
           <dt>인원</dt><dd>${x.people ? esc(x.people) + '명' : '-'}</dd>
           <dt>1인당 예산</dt><dd>${esc(x.budget || '-')}</dd>
-          <dt>메뉴</dt><dd>${esc(x.menu_choice || '-')}</dd>
+          <dt>메뉴</dt><dd>${esc(x.menu_items || x.menu_choice || '-')}</dd>
         </dl>
         <div class="status">
           ${STATUSES.map((s) => `<button type="button" data-id="${x.id}" data-status="${s}" class="${x.status === s ? 'on' : ''}">${s}</button>`).join('')}

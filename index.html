@@ -238,6 +238,28 @@
   }
   .choice input:checked + span { background: var(--forest); color: var(--cream); }
   .choice input:focus-visible + span { outline: 3px solid var(--moss); outline-offset: 2px; }
+  .picker { display: grid; gap: 10px; margin-top: 14px; }
+  .pick-row {
+    display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px;
+    background: var(--olive); border-radius: 1.5rem; padding: 12px 12px 12px 20px;
+  }
+  .pick-row b { display: block; font-size: 16px; }
+  .pick-row small { font-size: 13px; opacity: .75; }
+  .stepper { display: flex; align-items: center; gap: 4px; background: var(--cream); border-radius: 999px; padding: 4px; }
+  .stepper button {
+    width: 44px; height: 44px; border: 0; border-radius: 50%; cursor: pointer;
+    background: var(--forest); color: var(--cream); font-size: 22px; line-height: 1; font-family: var(--body);
+    transition: transform .6s var(--ease), opacity .6s var(--ease);
+  }
+  .stepper button:active { transform: scale(.92); }
+  .stepper button[disabled] { opacity: .25; cursor: default; }
+  .stepper output { min-width: 34px; text-align: center; font-family: var(--display); font-size: 22px; }
+  .pick-sum {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    background: var(--forest); color: var(--sage); border-radius: 1.5rem; padding: 14px 20px;
+  }
+  .pick-sum strong { font-family: var(--display); font-size: 24px; color: var(--cream); font-weight: 400; }
+  .pick-note { font-size: 13px; opacity: .75; margin: 0; }
   .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
   .consent input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--forest); flex: none; }
   .trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
@@ -358,21 +380,21 @@
         <div class="menu-card reveal">
           <div class="img">
             <div class="bg m1"><span>수제대추차 사진</span></div>
-            <div class="overlay"><a href="#inquiry" data-menu="미리 고르기">이 메뉴로 문의</a></div>
+            <div class="overlay"><a href="#inquiry" data-pick="수제대추차">이 메뉴 담기</a></div>
           </div>
           <div class="row"><h3>수제대추차</h3><span class="price">7,000</span></div>
         </div>
         <div class="menu-card reveal">
           <div class="img">
             <div class="bg m2"><span style="color:var(--cream)">샌드위치 사진</span></div>
-            <div class="overlay"><a href="#inquiry" data-menu="미리 고르기">이 메뉴로 문의</a></div>
+            <div class="overlay"><a href="#inquiry" data-pick="샌드위치">이 메뉴 담기</a></div>
           </div>
           <div class="row"><h3>샌드위치</h3><span class="price">7,500</span></div>
         </div>
         <div class="menu-card reveal">
           <div class="img">
             <div class="bg m3"><span>아메리카노 사진</span></div>
-            <div class="overlay"><a href="#inquiry" data-menu="미리 고르기">이 메뉴로 문의</a></div>
+            <div class="overlay"><a href="#inquiry" data-pick="아메리카노">이 메뉴 담기</a></div>
           </div>
           <div class="row"><h3>아메리카노</h3><span class="price">4,000</span></div>
         </div>
@@ -464,6 +486,22 @@
               <label class="choice"><input type="radio" name="menu_choice" value="미리 고르기"><span>미리 고를게요</span></label>
               <label class="choice"><input type="radio" name="menu_choice" value="현장에서 고르기" checked><span>현장에서 고를게요</span></label>
             </div>
+            <div class="picker" id="menuPicker" hidden>
+              <div class="pick-row" data-item="수제대추차" data-price="7000">
+                <div><b>수제대추차</b><small>7,000원</small></div>
+                <div class="stepper"><button type="button" data-step="-1" aria-label="수제대추차 하나 빼기">−</button><output aria-live="polite">0</output><button type="button" data-step="1" aria-label="수제대추차 하나 더하기">+</button></div>
+              </div>
+              <div class="pick-row" data-item="샌드위치" data-price="7500">
+                <div><b>샌드위치</b><small>7,500원</small></div>
+                <div class="stepper"><button type="button" data-step="-1" aria-label="샌드위치 하나 빼기">−</button><output aria-live="polite">0</output><button type="button" data-step="1" aria-label="샌드위치 하나 더하기">+</button></div>
+              </div>
+              <div class="pick-row" data-item="아메리카노" data-price="4000">
+                <div><b>아메리카노</b><small>4,000원</small></div>
+                <div class="stepper"><button type="button" data-step="-1" aria-label="아메리카노 하나 빼기">−</button><output aria-live="polite">0</output><button type="button" data-step="1" aria-label="아메리카노 하나 더하기">+</button></div>
+              </div>
+              <div class="pick-sum"><span id="pickCount">아직 고른 메뉴가 없어요</span><strong id="pickTotal">0원</strong></div>
+              <p class="pick-note">인원과 개수가 달라도 괜찮아요. 오셔서 바꿀 수 있어요.</p>
+            </div>
           </fieldset>
           <div class="trap" aria-hidden="true">
             <label for="website">웹사이트</label>
@@ -532,10 +570,36 @@
     }, { passive: true });
   }
 
-  // "이 메뉴로 문의"를 누르면 메뉴 선택을 '미리 고르기'로
-  document.querySelectorAll('[data-menu]').forEach((a) => a.addEventListener('click', () => {
-    const r = document.querySelector(`input[name=menu_choice][value="${a.dataset.menu}"]`);
-    if (r) r.checked = true;
+  // 메뉴 미리 고르기: '미리 고를게요'를 누르면 메뉴판이 열리고 개수를 정한다
+  const picker = document.getElementById('menuPicker');
+  const rows = [...picker.querySelectorAll('.pick-row')];
+  const qty = Object.fromEntries(rows.map((r) => [r.dataset.item, 0]));
+  const won = (n) => n.toLocaleString('ko-KR') + '원';
+  const renderPick = () => {
+    let count = 0, total = 0;
+    rows.forEach((r) => {
+      const n = qty[r.dataset.item];
+      r.querySelector('output').textContent = n;
+      r.querySelector('[data-step="-1"]').disabled = n === 0;
+      count += n; total += n * Number(r.dataset.price);
+    });
+    document.getElementById('pickCount').textContent = count ? `모두 ${count}개` : '아직 고른 메뉴가 없어요';
+    document.getElementById('pickTotal').textContent = won(total);
+  };
+  const preChoose = () => form.querySelector('input[value="미리 고르기"]').checked;
+  const syncPicker = () => { picker.hidden = !preChoose(); };
+  picker.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-step]');
+    if (!b) return;
+    const item = b.closest('.pick-row').dataset.item;
+    qty[item] = Math.max(0, Math.min(99, qty[item] + Number(b.dataset.step)));
+    renderPick();
+  });
+  // 메뉴 카드의 '이 메뉴 담기': 미리 고르기로 바꾸고 그 메뉴를 하나 담는다
+  document.querySelectorAll('[data-pick]').forEach((a) => a.addEventListener('click', () => {
+    form.querySelector('input[value="미리 고르기"]').checked = true;
+    qty[a.dataset.pick] = Math.min(99, qty[a.dataset.pick] + 1);
+    syncPicker(); renderPick();
   }));
 
   // 지난 날짜는 고를 수 없게
@@ -547,6 +611,8 @@
   const msg = document.getElementById('formMsg');
   const btn = document.getElementById('submitBtn');
   const show = (text, ok) => { msg.textContent = text; msg.className = 'msg ' + (ok ? 'ok' : 'err'); msg.hidden = false; };
+  form.querySelectorAll('input[name=menu_choice]').forEach((r) => r.addEventListener('change', syncPicker));
+  renderPick();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -558,9 +624,11 @@
       people: v('people'),
       budget: v('budget'),
       menu_choice: (form.querySelector('input[name=menu_choice]:checked') || {}).value || '',
+      menu_items: preChoose() ? Object.fromEntries(Object.entries(qty).filter(([, n]) => n > 0)) : {},
       website: v('website'),
       consent: document.getElementById('consent').checked,
     };
+    if (preChoose() && !Object.keys(data.menu_items).length) return show('메뉴를 하나 이상 골라 주세요. 아직 모르시면 "현장에서 고를게요"를 눌러 주세요.');
     if (!data.name || !data.contact) return show('이름과 연락처를 적어 주세요.');
     if (!data.meet_date || !data.people) return show('모임 날짜와 인원을 적어 주세요.');
     if (!data.budget) return show('1인당 예산을 골라 주세요.');
@@ -572,6 +640,8 @@
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || '보내지 못했어요. 잠시 뒤 다시 시도해 주세요.');
       form.reset();
+      Object.keys(qty).forEach((k) => { qty[k] = 0; });
+      syncPicker(); renderPick();
       show('문의가 접수됐어요. 확인 후 연락드릴게요.', true);
     } catch (err) {
       show(err.message || '보내지 못했어요. 잠시 뒤 다시 시도해 주세요.');

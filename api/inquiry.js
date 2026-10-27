@@ -7,6 +7,20 @@ const sbHeaders = () => ({
   'Content-Type': 'application/json',
 });
 const MENU_CHOICES = ['미리 고르기', '현장에서 고르기'];
+// 메뉴판(index.html)과 같은 이름·가격. 메뉴를 바꾸면 두 곳을 함께 고친다
+const MENU = { '수제대추차': 7000, '샌드위치': 7500, '아메리카노': 4000 };
+// { 수제대추차: 3, 아메리카노: 5 } → "수제대추차 3 · 아메리카노 5 / 합계 41,000원"
+const menuText = (items) => {
+  if (!items || typeof items !== 'object') return null;
+  let total = 0;
+  const parts = Object.keys(MENU).flatMap((name) => {
+    const n = parseInt(items[name], 10);
+    if (!Number.isInteger(n) || n < 1 || n > 99) return [];
+    total += n * MENU[name];
+    return [`${name} ${n}`];
+  });
+  return parts.length ? `${parts.join(' · ')} / 합계 ${total.toLocaleString('ko-KR')}원` : null;
+};
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST만 가능해요' });
@@ -26,6 +40,8 @@ module.exports = async (req, res) => {
     menu_choice: MENU_CHOICES.includes(b.menu_choice) ? b.menu_choice : '현장에서 고르기',
     consent: b.consent === true,
   };
+  row.menu_items = row.menu_choice === '미리 고르기' ? menuText(b.menu_items) : null;
+  if (row.menu_choice === '미리 고르기' && !row.menu_items) return res.status(400).json({ error: '메뉴를 하나 이상 골라 주세요' });
   if (!row.name || !row.contact) return res.status(400).json({ error: '이름과 연락처를 적어 주세요' });
   if (!row.meet_date || !row.people) return res.status(400).json({ error: '모임 날짜와 인원을 적어 주세요' });
   if (!row.consent) return res.status(400).json({ error: '개인정보 수집·이용에 동의해 주세요' });

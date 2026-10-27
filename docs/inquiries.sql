@@ -9,6 +9,7 @@ create table if not exists public.inquiries (
   people integer,
   budget text,
   menu_choice text,
+  menu_items text,  -- 미리 고른 메뉴 (예: 수제대추차 3 · 아메리카노 5 / 합계 41,000원)
   consent boolean not null default false,
   status text not null default '새 문의' check (status in ('새 문의', '연락함', '완료')),
   updated_at timestamptz
